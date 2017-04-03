@@ -32,7 +32,7 @@ targets t =
     let ts = [targets | Build n targets d c <- t]
      in nub (concat ts)
 
-depGraph :: [BakeItem] -> (G.Graph, G.Vertex ->
+depGraph :: BakeProgram -> (G.Graph, G.Vertex ->
     ((String, [String]), String, [String]),
                           String -> Maybe G.Vertex)
 depGraph bs =
