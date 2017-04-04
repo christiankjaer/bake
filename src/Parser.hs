@@ -1,6 +1,6 @@
 module Parser
     ( BakeProgram
-    , BakeItem(Build, Rule, Variable)
+    , BakeItem(Build, Rule, Constant)
     , parser
     , parseCall
     , parseFromFile
@@ -8,6 +8,7 @@ module Parser
 
 import Control.Applicative (empty)
 import Control.Monad (void)
+import Data.Maybe (isJust)
 
 import Text.Megaparsec
 import Text.Megaparsec.String
@@ -19,13 +20,14 @@ data BakeItem =
     Build { name :: String
           , targets :: [String]
           , dependencies :: [String]
+          , forall :: Bool
           , commands :: [String]
           }
   | Rule { name :: String
          , variables :: [String]
          , body :: String
          }
-  | Variable { name :: String
+  | Constant { name :: String
              , value :: String
              }
              deriving (Show)
@@ -47,15 +49,22 @@ parseFilename = do
     s <- some (choice [alphaNumChar, oneOf ",.-_[]/"])
     return s
 
-parseHeader :: Parser (String, [String], [String])
+parseName :: Parser String
+parseName = do
+    init <- lowerChar
+    rest <- many alphaNumChar
+    return (init:rest)
+
+parseHeader :: Parser (String, [String], [String], Bool)
 parseHeader = do
-    name <- some lowerChar
+    name <- parseName
     lexeme (char ':')
     targets <- sepEndBy parseFilename (many (oneOf " \t"))
     lexeme (string "<-")
+    forall <- optional (char '<')
     skipMany (oneOf " \t")
     deps <- sepBy parseFilename (many (oneOf " \t"))
-    return $ (name, targets, deps)
+    return $ (name, targets, deps, isJust forall)
 
 parseCommand :: Parser String
 parseCommand = lexeme (some (noneOf "\n"))
@@ -64,31 +73,31 @@ parseBuild :: Parser BakeItem
 parseBuild = L.nonIndented scn (L.indentBlock scn p)
     where
         p = do
-            (name, targets, deps) <- parseHeader
-            return $ L.IndentMany Nothing (return . (Build name targets deps)) parseCommand
+            (name, targets, deps, forall) <- parseHeader
+            return $ L.IndentMany Nothing (return . (Build name targets deps forall)) parseCommand
 
-parseVariable :: Parser BakeItem
-parseVariable = L.nonIndented scn p where
+parseConstant :: Parser BakeItem
+parseConstant = L.nonIndented scn p where
     p = do
         char '@'
-        name <- some alphaNumChar
+        name <- parseName
         skipMany (oneOf " \t")
         lexeme (string "<-")
         skipMany (oneOf " \t")
         val <- some (noneOf "\n")
-        return $ Variable name val
+        return $ Constant name val
 
 parseDecl :: Parser (String, [String])
 parseDecl = do
     char '@'
-    name <- some lowerChar
-    vars <- between (char '(') (char ')') $ sepBy1 (some lowerChar) (lexeme $ char ',')
+    name <- parseName
+    vars <- between (char '(') (char ')') $ sepBy1 parseName (lexeme $ char ',')
     return (name, vars)
 
 parseCall :: Parser (String, [String])
 parseCall = do
     char '@'
-    name <- some lowerChar
+    name <- parseName
     vars <- between (char '(') (char ')') $ sepBy1 (some (noneOf ",()")) (lexeme $ char ',')
     return (name, vars)
 
@@ -101,7 +110,7 @@ parseRule = L.nonIndented scn (L.indentBlock scn p)
 
 
 parseItem :: Parser BakeItem
-parseItem = try parseVariable <|> try parseRule <|> parseBuild
+parseItem = try parseConstant <|> try parseRule <|> parseBuild
 
 parser :: Parser BakeProgram
 parser = do

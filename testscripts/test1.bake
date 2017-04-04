@@ -1,2 +1,0 @@
-main: main.exe <- main.c
-  cc blah blah

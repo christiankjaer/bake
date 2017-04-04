@@ -5,7 +5,7 @@
 
 # Ladada
 main: main <- main.c test.o lib.o
-  @buildc(main.c test.o lib.o, main)
+  @buildc(@input, main)
 
 test: test.o <- test.c lib.o
   @cc -c test.c lib.o

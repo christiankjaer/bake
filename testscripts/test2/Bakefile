@@ -1,0 +1,8 @@
+@cc <- gcc
+@cflags <- -Wall -pedantic -std=c99
+
+@compileLib(in, out)
+    @cc -c -o @out @in @cflags
+
+libs: math.o list.o <-< math.c list.c
+    @compileLib(@input, @output)
