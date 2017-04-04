@@ -3,7 +3,7 @@
 
 module Main where
 
-import Lib
+import Parser
 import qualified Data.Graph as G
 import qualified Data.Map as M
 import Data.List
@@ -36,7 +36,7 @@ deps prog = M.fromList [(n, ds) | Build n ts ds cs <- prog]
 -- It also returns lookup functions from vertices
 -- to the actual buildsteps.
 depGraph :: BakeProgram -> (G.Graph, G.Vertex ->
-    ((String, [String]), String, [String]),
+    (BuildStep, String, [String]),
                           String -> Maybe G.Vertex)
 depGraph bs =
     let names = foldr (\(k,v) -> M.insertWith (++) k [v])

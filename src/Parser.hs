@@ -1,4 +1,4 @@
-module Lib
+module Parser
     ( BakeProgram
     , BakeItem(Build, Rule, Variable)
     , parser
