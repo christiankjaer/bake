@@ -6,7 +6,7 @@ module Main where
 import Lib
 import qualified Data.Graph as G
 import qualified Data.Map as M
-import Data.List as L
+import Data.List
 
 import Text.Regex.PCRE.Heavy (sub, gsub, re)
 
@@ -21,23 +21,33 @@ import System.Exit
 import Control.Monad
 import Control.Monad.Except
 
-type CmdMonad = ExceptT String IO
+-- Error monad that contains the error and the code.
+type CmdMonad = ExceptT (String, ExitCode) IO
 
 type VTable = [(String, String)]
 type RTable = [(String, ([String], String))] -- Rule table. Name => (params, body)
-type BuildStep = (String, [String], [String]) -- Name, dependencies, cmds
+type BuildStep = (String, [String]) -- Name, cmds
+type DepMap = M.Map String [String]
 
-targets :: BakeProgram -> [String]
-targets t =
-    let ts = [targets | Build n targets d c <- t]
-     in nub (concat ts)
+deps :: BakeProgram -> DepMap
+deps prog = M.fromList [(n, ds) | Build n ts ds cs <- prog]
 
+-- Uses Data.Graph to build a dependency graph
+-- It also returns lookup functions from vertices
+-- to the actual buildsteps.
 depGraph :: BakeProgram -> (G.Graph, G.Vertex ->
     ((String, [String]), String, [String]),
                           String -> Maybe G.Vertex)
 depGraph bs =
-    let nodes = [[((n, c), t, ds) | t <- ts] | Build n ts ds c <- bs]
-     in G.graphFromEdges (nub . concat $ nodes)
+    let names = foldr (\(k,v) -> M.insertWith (++) k [v])
+                      M.empty
+                      [(t, n) | Build n ts ds cs <- bs,
+                                t <- ts]
+        f = map (\d -> case M.lookup d names of
+                         Nothing -> []
+                         Just l -> l)
+        nodes = [((n, c), n, concat (f ds)) | Build n ts ds c <- bs]
+     in G.graphFromEdges nodes
 
 -- Creates a variable table containing the global variables.
 vTable :: BakeProgram -> VTable
@@ -125,7 +135,7 @@ buildPlan :: BakeProgram -> [BuildStep]
 buildPlan bs =
     let (g, f1, f2) = depGraph bs
         sorted = reverse $ G.topSort g
-     in map ((\((a, a'),b,c) -> (a, a', c)) . f1) sorted
+     in map ((\((a, a'),b,c) -> (a, a')) . f1) sorted
 
 -- Executes one command. Can fail.
 execCmds :: String -> [String] -> CmdMonad ()
@@ -138,31 +148,39 @@ execCmds name (cmd:cmds) = do
       ExitSuccess -> do
           execCmds name cmds
       ExitFailure n -> do
-          throwError $ "Step '" ++ name ++ "' failed with exit code: " ++ (show n)
+          throwError $ ( "Step '" ++ name ++ "' failed with exit code: " ++ (show n)
+                       , code
+                       )
 
 
 -- Executes an entire build step. Checks that the dependencies exist as well.
-execStep :: BuildStep -> CmdMonad ()
-execStep (name, cmds, deps) = do
-    b <- liftIO $ mapM doesFileExist deps
-    if not $ all id b
-       then throwError $ "Step '" ++ name ++ "' failed, dependencies not found: " ++ show deps
-       else execCmds name cmds
+execStep :: DepMap -> BuildStep -> CmdMonad ()
+execStep dm (name, cmds) =
+    let deps = case M.lookup name dm of
+                 Nothing -> []
+                 Just ds -> ds
+    in do
+        b <- liftIO $ mapM doesFileExist deps
+        if not $ all id b
+           then throwError $ ( "Step '" ++ name ++ "' failed, dependencies not found: " ++ show deps
+                             , ExitFailure 1
+                             )
+                             else execCmds name cmds
 
 
 -- Executes a sequence of build steps. Stops if one fails.
-execPlan :: [BuildStep] -> IO ()
-execPlan [] = return ()
-execPlan (step:steps) = do
-    res <- runExceptT (execStep step)
+execPlan :: DepMap -> [BuildStep] -> IO ()
+execPlan ds [] = return ()
+execPlan ds (step:steps) = do
+    res <- runExceptT (execStep ds step)
     case res of
-      Left e -> putStrLn e >> exitWith (ExitFailure 1)
-      Right () -> execPlan steps
+      Left (e, c) -> putStrLn e >> exitWith c
+      Right () -> execPlan ds steps
 
 
 -- Executes the entire bakefile.
 execBakefile :: BakeProgram -> IO ()
-execBakefile prog = execPlan . buildPlan . simplify $ prog
+execBakefile prog = (execPlan $ deps prog) . buildPlan . simplify $ prog
 
 
 main :: IO ()
