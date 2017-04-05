@@ -4,17 +4,8 @@
   @cc -o @output @inputfiles
 
 # Ladada
-main: main <- main.c test.o lib.o
-  @buildc(@input, main)
-
-test: test.o <- test.c lib.o
-  @cc -c test.c lib.o
+app: app <- app.c lib.o
+  @buildc(@input, app)
 
 lib: lib.o <- lib.c lib.h
   @cc -c lib.c
-
-doc: doc.pdf <- doc.md
-  pandoc -o @output @input
-
-zip: final.zip <- main doc.pdf
-  zip @output @input
