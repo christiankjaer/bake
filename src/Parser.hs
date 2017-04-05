@@ -1,5 +1,6 @@
 module Parser
     ( BakeProgram
+    , BuildStep
     , BakeItem(Build, Rule, Constant)
     , parser
     , parseCall
@@ -15,6 +16,7 @@ import Text.Megaparsec.String
 import qualified Text.Megaparsec.Lexer as L
 
 type BakeProgram = [BakeItem]
+type BuildStep = String -- Name
 
 data BakeItem =
     Build { name :: String
