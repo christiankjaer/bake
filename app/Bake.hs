@@ -35,6 +35,14 @@ deps prog = M.fromList [(n, ds) | Build n _ ds _ _ <- prog]
 
 cmds :: BakeProgram -> CmdMap
 cmds prog = M.fromList [(n, cs) | Build n _ _ _ cs <- prog]
+--
+-- Creates a constants table containing the global constants
+cTable :: BakeProgram -> CTable
+cTable prog = [(name, val) | Constant name val <- prog]
+
+-- Creates a rule table containing all the rules of the bakefile
+ruleTable :: BakeProgram -> RTable
+ruleTable prog = [(name, (consts, cmds)) | Rule name consts cmds <- prog]
 
 -- Uses Data.Graph to build a dependency graph
 -- It also returns lookup functions from vertices
@@ -52,14 +60,6 @@ depGraph bs =
                          Just l -> l)
         nodes = [(n, n, concat (f ds)) | Build n _ ds _ _ <- bs]
      in G.graphFromEdges nodes
-
--- Creates a constants table containing the global constants
-cTable :: BakeProgram -> CTable
-cTable prog = [(name, val) | Constant name val <- prog]
-
--- Creates a rule table containing all the rules of the bakefile
-ruleTable :: BakeProgram -> RTable
-ruleTable prog = [(name, (consts, cmds)) | Rule name consts cmds <- prog]
 
 -- Substitutes constants into the body of a build
 substConst :: CTable -> BakeItem -> BakeItem
