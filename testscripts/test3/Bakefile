@@ -10,4 +10,4 @@ zip: final.zip <- file1.pdf file2.pdf file3.pdf
 files2: somedata.md moredata.md crap.md <-
   @txtFile(Mere input, moredata.md)
   @txtFile(Hej med alle sammen, somedata.md)
-  @txtFile(Mare alle sammen, crap.md)
+  @txtFile(PLD er sjovt, crap.md)
