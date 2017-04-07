@@ -4,7 +4,6 @@ version:             0.1.0.0
 -- description:
 homepage:            https://github.com/christiankjaer/bake#readme
 license:             BSD3
-license-file:        LICENSE
 author:              Christian Kjær Larsen
 maintainer:          christianden@gmail.com
 copyright:           2017 Christian Kjær Larsen
