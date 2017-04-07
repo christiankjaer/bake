@@ -5,6 +5,7 @@ module Deps
 import Parser
 
 import qualified Data.Graph as G
+import qualified Data.Tree as T
 import qualified Data.Map as M
 import Data.List
 
@@ -25,9 +26,13 @@ depGraph bs =
         nodes = [(n, n, concat (f ds)) | Build n _ ds _ _ <- bs]
      in G.graphFromEdges nodes
 
+-- Uses the graph library to check for cycles.
+hasCycles :: G.Graph -> Bool
+hasCycles g = any id [length sf /= 0 | T.Node _ sf <- G.scc g]
+
 -- Calculates the correct order of dependencies, and
 -- makes a plan for the build.
-buildPlan :: BakeProgram -> Maybe BuildStep -> [BuildStep]
+buildPlan :: BakeProgram -> Maybe BuildStep -> Maybe [BuildStep]
 buildPlan bs target =
     let (g, f1, f2) = depGraph bs
         sorted = reverse $ G.topSort g
@@ -37,4 +42,6 @@ buildPlan bs target =
                      case f2 t of
                        Just vertex -> G.reachable g vertex
                        Nothing -> sorted
-     in map ((\(a,b,c) -> a) . f1) (sorted `intersect` goal)
+     in if hasCycles g
+          then Nothing
+          else Just $ map ((\(a,b,c) -> a) . f1) (sorted `intersect` goal)

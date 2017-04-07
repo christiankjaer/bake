@@ -74,7 +74,11 @@ execBakefile :: BakeProgram -> Maybe BuildStep -> IO ()
 execBakefile prog target =
     let prog' = simplify prog
         plan = buildPlan prog' target
-     in (execPlan (deps prog') (cmds prog')) plan
+     in case plan of
+          Just p -> (execPlan (deps prog') (cmds prog')) p
+          Nothing -> do
+              putStrLn "Error: Dependency graph has cycles"
+              exitWith (ExitFailure 3)
 
 main :: IO ()
 main = do
